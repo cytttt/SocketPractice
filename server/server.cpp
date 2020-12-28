@@ -13,7 +13,12 @@
 #include <pthread.h>
 #include <iomanip>
 #include <unordered_map>
+#include <assert.h>
+#include "threadpool.h"
+
 #define BUFF_SIZE 1024
+#define THREAD 32
+#define QUEUE  256
 #define BACKLOG 5
 
 using namespace std;
@@ -45,7 +50,7 @@ std::vector<string> parsing(string str,string deli);
 Action 				Decide(vector<string> &v);
 string 				getList(string user_name);
 // *********** thread function *********** //
-void* 				user_thread(void*socket_ptr);
+void				user_thread(void*socket_ptr);
 bool 				Register(string userAccountName,string depositAmount);
 bool 				Login(string userAccountName,string portNum);
 bool 				Exit(string user_name);
@@ -66,6 +71,10 @@ int main(int argc, char* argv[])
     char buffer[BUFF_SIZE] = {0}; 
     std::vector<pthread_t> tid_vec;
     pthread_mutex_init(&mutexX,NULL);
+    //
+    threadpool_t *pool;
+    assert((pool = threadpool_create(THREAD, QUEUE, 0)) != NULL);
+    cout << "Pool started with " << THREAD << " threads and queue size of " << QUEUE <<'\n';
     // constant string 
     const string greeting = "connection accepted!\r\n";
     // Creating socket file descriptor 
@@ -91,9 +100,11 @@ int main(int argc, char* argv[])
     	}
     	send(*new_socket,greeting.c_str(),strlen(greeting.c_str()),0); // send greeting
     	// create thread for this user
-    	pthread_t  tid;
-    	tid_vec.push_back(tid);
-    	pthread_create(&tid_vec[tid_vec.size()-1],NULL,user_thread,new_socket);
+    	//pthread_t  tid;
+    	//tid_vec.push_back(tid);
+    	//pthread_create(&tid_vec[tid_vec.size()-1],NULL,user_thread,new_socket);
+    	threadpool_add(pool, &user_thread, new_socket, 0);
+    	
     	
     }
 }
@@ -126,7 +137,7 @@ std::vector<string> parsing(string str,string deli)
 	}
 	return res;
 }
-void *user_thread(void*socket_ptr)
+void user_thread(void*socket_ptr)
 {
 	int sockfd = *(int*)socket_ptr; // socker to listen
 	string user_name ; // if login 
@@ -140,12 +151,14 @@ void *user_thread(void*socket_ptr)
 
 
 
-	while(true){
+	while(!end){
 		char cbuffer[BUFF_SIZE] = {0};
 		int checkpoint = recv(sockfd,cbuffer,BUFF_SIZE,0);
-		if(!checkpoint){
+		if(checkpoint <= 0){
 			cerr<<": A user disconnected unexpectedly :("<<endl;
-			pthread_exit(NULL);
+			end=true;
+			break;
+			//pthread_exit(NULL);
 		}
 		// parsing
 		string buffer = cbuffer;
@@ -209,14 +222,14 @@ void *user_thread(void*socket_ptr)
 					Exit(user_name);
 					send(sockfd,BYE.c_str(),strlen(BYE.c_str()),0);	
 				}
-				pthread_exit(NULL);	
+				//pthread_exit(NULL);	
+				end = true;
 				break;
 			default:
 				cerr << ": unknown command !!" << endl;
 
 		}
 	}
-
 }
 // read reg_deposit login_list
 string getList(string user_name)

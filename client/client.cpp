@@ -436,7 +436,7 @@ bool Transaction(string userAccountName,string payAmount,string payeeAccountName
         cout << "\nConnection Failed \n"; 
         return -1; 
     } 
-    string msg = userAccountName + "#" + payAmount +"#"+payeeAccountName+"\r\n";
+    string msg = userAccountName + "#" + payAmount +"#"+payeeAccountName;
 	
 	send(payee_sockfd,msg.c_str(),strlen(msg.c_str()),0); // send request
 	recv(payee_sockfd,cbuffer,BUFF_SIZE,0); // get response
